@@ -1,0 +1,305 @@
+import streamlit as st
+#from st_files_connection import FilesConnection
+import pandas as pd
+from io import StringIO
+#create_pandas_dataframe_agent
+from langchain_experimental.agents import create_pandas_dataframe_agent
+import io
+from getpass import getpass
+
+import sys
+import os
+from langchain.chat_models import ChatOpenAI
+from langchain.llms import OpenAI
+from langchain.embeddings import GooglePalmEmbeddings
+import google.generativeai as palm
+from getpass import getpass
+from PIL import Image
+from langchain.embeddings import HuggingFaceEmbeddings
+
+from dotenv import load_dotenv
+
+def set_stage(stage):
+    st.session_stage.stage = stage
+    
+#image = Image.open(r'C:\Users\szayan\Downloads\valeo.jpeg')
+image_1=Image.open(r'C:\Users\szayan\Downloads\valeo.jpeg')
+image_2=Image.open(r'C:\Users\szayan\Downloads\gcloud_logo.jpeg')
+col1,col2=st.columns(2)
+with col1:
+    st.image(image_1,width=200)
+
+with col2:
+    st.image(image_2,width=200)
+
+os.environ["OPENAI_API_KEY"] = ""
+#loading the API key
+#HUGGINGFACEHUB_API_TOKEN = getpass()
+#os.environ['HUGGINGFACEHUB_API_TOKEN'] = ''#vector store
+#from langchain import HuggingFaceHub  #model hub
+
+
+
+#repo_id = "meta-llama/Llama-2-13b-chat-hf"
+#llm = HuggingFaceHub(repo_id=repo_id, model_kwargs={'temperature': 0.1})
+#from langchain import HuggingFaceHub  #model hub
+
+template = """You are a smart system architect engineer, your task is to allocate the stakeholder requirements to organizational functions that shall realize the requirement.
+the organizational functions are System, Hardware, Mechanics, Software, Testing, Project Management
+System: Requirements related to overall functionality, interaction between components, and operational logic.
+
+Hardware: Requirements concerning physical components, environmental conditions, and performance limits.
+
+Software: Requirements addressing implementation, execution environment, communication, and system behavior.
+
+Mechanics: Requirements defining physical structure, dimensions, and material properties.
+
+Security: Requirements ensuring protection mechanisms, data integrity, and secure operations.
+
+Project Management: Requirements covering planning, deliverables, schedules, and resources.
+
+Quality Management: Requirements associated with assurance processes, compliance, and performance validation.
+
+Testing: Requirements specifying evaluation methods, assessment conditions, and verification standards.
+
+Examples in format (requirement:organizational function):
+1.1.0-1 This document and related standards outline the fundamental responsibilities of the service provider.:Project Management
+1.1.0-2.0-1 The service provider must verify the consistency of the outlined requirements.:Project Management
+1.1.0-2.0-2 If inconsistencies arise, the service provider must notify the client in a structured format promptly.:Project Management
+1.1.0-3 If any information is found to be lacking, the service provider must report this to the client immediately in a structured format.:Project Management
+2.1.0-1 A structured model must be developed.:System
+2.1.0-7 The processing unit is expected to support safety-critical functionalities of a certain classification.:Safety
+2.1.0-8 The processing unit is expected to support higher-level safety-critical functionalities.:Safety
+2.1.0-9 The specific modeling format and exchange protocol must be agreed upon with the client.:System
+2.2.0-1 The processing unit will be positioned in a specific location in Platform A.:Hardware
+2.2.0-2 The processing unit will be positioned in a specific location in Platform B.:Hardware
+2.2.0-3 The maximum operational temperature for the processing unit shall not exceed a predefined threshold.:Hardware
+2.3.0-1 The processing unit shall be linked via a network connection with a predefined configuration and an upgrade option.:System
+2.3.0-2 The processing unit shall connect via a separate high-speed link to another system, acting as a controller.:System
+2.3.0-3 The processing unit shall interface with a specific communication bus.:System
+2.3.0-4 The processing unit shall provide an optional advanced communication interface.:System
+2.3.0-5 The processing unit shall offer a reserve communication interface for potential future features.:System
+2.3.0-6 The processing unit shall provide a dedicated connection to an optical device as an optional future feature.:Mechanics
+2.3.0-7 The processing unit shall handle image processing for these optical devices.:System
+2.3.0-8 The processing unit shall provide an additional connection to a different optical device for potential expansion.:System
+2.3.0-9 The processing unit shall perform image processing for this additional optical device.:System
+2.3.0-10 The processing unit shall provide a direct link to a rear observation system.:System
+2.3.0-11 The processing unit shall handle image processing for the rear observation system.:System
+2.3.0-12 The processing unit shall provide multiple spare links for peripheral visual devices.:System
+2.3.0-13 The peripheral visual devices shall operate at a defined resolution.:System
+2.3.0-14 The processing unit shall manage image processing for these peripheral visual devices.:System
+2.3.0-15 The processing unit shall provide an additional network link for future scalability, acting as a controlled device.:System
+2.3.0-16 The processing unit shall provide an additional network link for another module, acting as a controlled device.:System
+2.3.0-17 The processing unit shall provide extra network links for expansion capabilities.:System
+2.3.0-18 The supplier must align spare connection specifications with the client.:System
+3.2.0-1 The supplier shall deliver a structured circuit representation of their software architecture.:Software
+3.3.1.0-1 The processing unit shall integrate client-provided functionalities.:Software
+3.3.1.0-2 The supplier shall offer an optional driving assistance functionality.:System
+3.3.1.0-3 The processing unit shall integrate processing capabilities for additional optical devices.:System
+3.3.1.0-4 The processing unit shall integrate processing capabilities for the rear observation system.:System
+3.3.1.0-5 The system shall allocate specific computational resources for software components.:System
+3.3.1.0-6 Alternative resource allocations shall be available for software components.:System
+3.3.1.0-7 The processing unit shall receive input from multiple sensor modules via predefined communication pathways.:System
+3.3.1.0-11 The processing unit shall support remote software updates.:System
+3.3.1.0-12 The system architecture shall allow scalable integration of additional functionalities.:System
+3.3.1.1-1 The supplier shall provide the complete development environment required for software integration.:Software
+3.3.1.1-2 The supplier shall ensure a full integration setup for software deployment.:Software
+3.3.1.1-3 The integration setup shall support compatibility with external systems.:Software
+3.3.1.1-4 The real-time scheduling interval shall be defined.:Software
+3.3.1.1-5 The system shall support partial updates during operation.:Software
+3.3.1.1-6 Dataset management shall support structured generation and partial updates.:Software
+3.3.1.1-7 The development interface shall adhere to defined specifications.:System
+3.3.1.1-8 The communication interface shall support specific data transfer rates.:System
+3.3.1.1-9 The system shall support specific data logging and processing speeds.:System
+3.3.1.1-11 The system shall enable integration with designated measurement tools.:Testing
+3.3.1.1-12 The supplier shall provide development kits, including an initialization environment.:Project Management
+3.3.1.2-1 The system shall support lane detection over a predefined duration and speed.:System
+3.3.1.2-2 The system shall support object recognition over a specified distance.:System
+3.3.1.2-6 The system shall detect specific environmental features at a designated range.:System
+3.3.2.1.0-1 Development shall adhere to established industry guidelines.:System
+3.3.2.2-1 To aid development and diagnostics, a standardized calibration protocol shall be implemented.:Software
+3.3.2.3-1 The system shall comply with general and unit-specific diagnostic requirements.:System
+3.4.0-1 A structured model for software and hardware architecture must be provided.:System
+3.4.0-2 The modeling format and exchange protocol must be determined with the client.:System
+3.5.0-1 Compliance with defined internal standards is required.:System
+3.5.1.0-1 The supplier must ensure backward compatibility of software and hardware updates.:System
+3.6.0-1 The system shall only receive power through designated connections.:Hardware
+3.6.1.0-1 Compliance with predefined electrical system requirements is mandatory.:Hardware
+3.6.1.0-3 Connector design shall follow established mechanical standards.:Mechanics
+3.6.1.0-4 Current measurements shall be conducted in a controlled laboratory environment.:Hardware
+3.6.1.0-5 Measurement results must be compiled according to specified reporting formats.:Hardware
+3.6.2.0-1 Compliance with predefined mechanical standards is required.:Mechanics
+
+ALWAYS return a "," part after your answer.
+
+Example of your response should be:
+
+```
+Hardware,
+
+```
+
+please classify the following requirement into the right organizational function and explain your answer specifically. requirement:{}
+"""
+
+def create_agent(data: str, llm):
+    """Create a Pandas DataFrame agent."""
+    return create_pandas_dataframe_agent(llm, data, verbose=False)
+
+st.title('Alloc-AI🤖')
+
+uploaded_file = st.file_uploader("Choose a file")
+if uploaded_file is not None:
+    # To read file as bytes:
+    df = pd.read_csv(uploaded_file)
+    st.dataframe(df)
+
+result = None   
+
+st.subheader('Run allocation process depending on business group')
+with st.form("my_form1"):
+    type_selection = st.radio(
+    "What is your business group?",
+    ["CDA", "PTS", "THS", "VIS"])
+    
+    
+    submitted = st.form_submit_button("Submit & run allocation process")
+    if submitted:
+        st.write(f"Processing Allocation for {type_selection}")
+       
+        if type_selection == 'CDA':
+             llm=OpenAI()
+             # Agent creation
+             agent = create_agent(df, llm)
+             # Run model 
+             for index, row in df.iterrows():
+                    print("Reqiurment {} : {}".format(index,row['ObjectText'],),end='\n\n')
+                    prompt=template.format(row['ObjectText'])
+
+                
+                #print("\n"+ promptt+"\n")
+                    #st.write(row['ObjectText'])
+                    
+                    response =llm(prompt)
+                    #print("\n"+ response+"\n")
+                    #st.write(response)
+                    df.at[index,'AIout']=response.split(",")[0]
+                    df.at[index,'justification']=response.split(",")[1]
+                    print(index)
+                    print(response.split(",")[1])
+                    
+             result=df.to_csv(r'rslt.csv')
+             st.dataframe(df)
+             
+
+        # if type_selection == 'PTS':
+           # st.write("running allocation for PTS")
+           # llm=ChatOpenAI(model_name="gpt-3.5-turbo")
+           # # Agent creation
+           # agent = create_agent(df, llm)
+           # # Run model 
+           # for index, row in df.iterrows():
+                # print("Reqiurement {} : {}".format(index,row['ObjectText'],),end='\n\n')
+                # #response=.format(row['ObjectText'])
+                # print(template_1)
+                # #print("\n"+ promptt+"\n")
+                # response = llm(template_1)
+                # print("\n"+ response+"\n")
+                # df.at[index,'Aiout']=response.split(",")[0]
+                # df.at[index,'justification']=response.split(",")[1]
+           # result=df.to_csv(r'rslt.csv')
+        if type_selection == 'PTS':
+             llm=OpenAI()
+             # Agent creation
+             agent = create_agent(df, llm)
+             # Run model 
+             for index, row in df.iterrows():
+                    print("Reqiurment {} : {}".format(index,row['ObjectText'],),end='\n\n')
+                    prompt=template.format(row['ObjectText'])
+
+                
+                #print("\n"+ promptt+"\n")
+                    #st.write(row['ObjectText'])
+                    
+                    response =llm(prompt)
+                    #print("\n"+ response+"\n")
+                    #st.write(response)
+                    df.at[index,'Aiout']=response.split(",")[0]
+                    df.at[index,'justification']=response.split(",")[1]
+                    print(index)
+                    print(response.split(",")[1])
+             result=df.to_csv(r'rslt.csv')
+             st.dataframe(df)
+             
+        if type_selection == 'THS':
+             llm=OpenAI()
+             # Agent creation
+             agent = create_agent(df, llm)
+             # Run model 
+             for index, row in df.iterrows():
+                    print("Reqiurment {} : {}".format(index,row['ObjectText'],),end='\n\n')
+                    prompt=template.format(row['ObjectText'])
+
+                
+                #print("\n"+ promptt+"\n")
+                    #st.write(row['ObjectText'])
+                    
+                    response =llm(prompt)
+                    #print("\n"+ response+"\n")
+                    #st.write(response)
+                    df.at[index,'Aiout']=response.split(",")[0]
+                    #df.at[index,'justification']=response.split(",")[1]
+                    print(index)
+                    print(response.split(",")[1])
+             result=df.to_csv(r'rslt.csv')
+             st.dataframe(df)
+        
+        if type_selection == 'VIS':
+             llm=OpenAI()
+             # Agent creation
+             agent = create_agent(df, llm)
+             # Run model 
+             for index, row in df.iterrows():
+                    print("Reqiurment {} : {}".format(index,row['ObjectText'],),end='\n\n')
+                    prompt=template.format(row['ObjectText'])
+
+                
+                #print("\n"+ promptt+"\n")
+                    #st.write(row['ObjectText'])
+                    
+                    response =llm(prompt)
+                    #print("\n"+ response+"\n")
+                    #st.write(response)
+                    df.at[index,'Aiout']=response.split(",")[0]
+                    df.at[index,'justification']=response.split(",")[1]
+                    print(index)
+                    print(response.split(",")[1])
+             result=df.to_csv(r'rslt.csv')
+             st.dataframe(df)
+        
+
+if result : 
+    
+        st.download_button(label='📥 Download Current Result',
+                                data=result ,
+                                file_name= 'ai_result_requirements.csv', 
+                                )
+
+st.subheader('Run allocation process using specific prompt')
+with st.form("my_form"):
+   text_input = st.text_input(
+        "Enter your prompt here 👇",
+        placeholder="example of prompt",
+    )
+
+
+   # Every form must have a submit button.
+   submitted = st.form_submit_button("Submit & run allocation process")
+   if submitted:
+       llm=ChatOpenAI(model_name="gpt-3.5-turbo")
+       # Agent creation
+       agent = create_agent(df, llm)
+       st.write("Prompt", text_input)
+       response = agent.run(text_input,df)
+       st.write(response)
+
